@@ -39,3 +39,17 @@
 
 # debug information files
 *.dwo
+
+# CMake build artifacts
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/CTestTestfile.cmake
+/*.ninja
+/build.ninja
+/cmake-build-*/
+/Testing/
+/install_manifest.txt
+.vscode/
