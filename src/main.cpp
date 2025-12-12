@@ -76,39 +76,75 @@ GLuint createShaderProgram(const string& vertPath, const string& fragPath) {
     return program;
 }
 
-// Camera state
-float cameraDistance = 1e12;
-float cameraTheta = M_PI / 4.0f;  // Elevation angle
-float cameraPhi = 0.0f;            // Azimuth angle
-bool mousePressed = false;
-double lastMouseX = 0.0;
-double lastMouseY = 0.0;
-
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        mousePressed = (action == GLFW_PRESS);
-        if (mousePressed) {
-            glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+struct Camera {
+    float distance = 3e11f;
+    float theta = M_PI / 4.0f;    // Elevation angle
+    float phi = 0.0f;              // Azimuth angle
+    float minDistance = 1e10f;
+    float maxDistance = 6e11f;
+    float sensitivity = 0.005f;
+    float zoomSpeed = 0.1f;
+    
+    bool mousePressed = false;
+    double lastMouseX = 0.0;
+    double lastMouseY = 0.0;
+    
+    vec3 getPosition() const {
+        return vec3(
+            distance * sin(theta) * cos(phi),
+            distance * cos(theta),
+            distance * sin(theta) * sin(phi)
+        );
+    }
+    
+    mat4 getViewMatrix() const {
+        return lookAt(getPosition(), vec3(0.0f), vec3(0.0f, 1.0f, 0.0f));
+    }
+    
+    mat4 getProjectionMatrix(float aspectRatio) const {
+        return perspective(radians(45.0f), aspectRatio, 1e9f, 1e13f);
+    }
+    
+    void onMouseButton(GLFWwindow* window, int button, int action) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            mousePressed = (action == GLFW_PRESS);
+            if (mousePressed) {
+                glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+            }
         }
     }
+    
+    void onMouseMove(double xpos, double ypos) {
+        if (mousePressed) {
+            double dx = xpos - lastMouseX;
+            double dy = ypos - lastMouseY;
+            
+            phi += dx * sensitivity;
+            theta = glm::clamp(theta - (float)dy * sensitivity, 0.1f, (float)M_PI - 0.1f);
+            
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+        }
+    }
+    
+    void onScroll(double yoffset) {
+        distance *= (1.0f - yoffset * zoomSpeed);
+        distance = glm::clamp(distance, minDistance, maxDistance);
+    }
+};
+
+Camera camera;
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    camera.onMouseButton(window, button, action);
 }
 
 void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
-    if (mousePressed) {
-        double dx = xpos - lastMouseX;
-        double dy = ypos - lastMouseY;
-        
-        cameraPhi += dx * 0.005f;
-        cameraTheta = glm::clamp(cameraTheta - (float)dy * 0.005f, 0.1f, (float)M_PI - 0.1f);
-        
-        lastMouseX = xpos;
-        lastMouseY = ypos;
-    }
+    camera.onMouseMove(xpos, ypos);
 }
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    cameraDistance *= (1.0f - yoffset * 0.1f);
-    cameraDistance = glm::clamp(cameraDistance, 1e10f, 1e12f);
+    camera.onScroll(yoffset);
 }
 
 struct Body {
@@ -197,16 +233,10 @@ struct Engine {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Calculate camera position
-        vec3 cameraPos = vec3(
-            cameraDistance * sin(cameraTheta) * cos(cameraPhi),
-            cameraDistance * cos(cameraTheta),
-            cameraDistance * sin(cameraTheta) * sin(cameraPhi)
-        );
-        
-        // View and projection matrices
-        mat4 view = lookAt(cameraPos, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-        mat4 projection = perspective(radians(45.0f), (float)WIDTH / (float)HEIGHT, 1e9f, 1e12f);
+        // Get camera matrices
+        vec3 cameraPos = camera.getPosition();
+        mat4 view = camera.getViewMatrix();
+        mat4 projection = camera.getProjectionMatrix((float)WIDTH / (float)HEIGHT);
         mat4 invView = inverse(view);
         mat4 invProj = inverse(projection);
         
