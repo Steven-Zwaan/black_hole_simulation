@@ -7,10 +7,13 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories("C:/msys64/mingw64/include")
 link_directories("C:/msys64/mingw64/lib")
 
-add_executable(black_hole_simulation src/main.cpp)
+add_executable(black_hole_simulation 
+    src/main.cpp
+)
 
 # Use the actual MSYS2 library name
 target_link_libraries(black_hole_simulation
     glfw3
+    glew32
     opengl32
 )
